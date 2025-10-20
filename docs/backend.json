@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "RedirectLink": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "RedirectLink",
+      "type": "object",
+      "description": "Stores a unique short URL and its corresponding target URL for redirection, along with associated metadata.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the redirect link."
+        },
+        "shortUrl": {
+          "type": "string",
+          "description": "The generated short URL that users will access."
+        },
+        "targetUrl": {
+          "type": "string",
+          "description": "The actual Depop listing URL to which users will be redirected."
+        },
+        "createdTimestamp": {
+          "type": "string",
+          "description": "Timestamp indicating when the redirect link was created.",
+          "format": "date-time"
+        },
+        "aiStyleSuggestion": {
+          "type": "string",
+          "description": "AI generated suggestion based on the item"
+        }
+      },
+      "required": [
+        "id",
+        "shortUrl",
+        "targetUrl",
+        "createdTimestamp"
+      ]
+    },
+    "UserActivity": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserActivity",
+      "type": "object",
+      "description": "Logs user activity related to accessing redirect links and passing bot detections.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user activity record."
+        },
+        "redirectLinkId": {
+          "type": "string",
+          "description": "Reference to RedirectLink. (Relationship: RedirectLink 1:N UserActivity)"
+        },
+        "userIdentifier": {
+          "type": "string",
+          "description": "Anonymized identifier for the user accessing the link (e.g., session ID)."
+        },
+        "accessTimestamp": {
+          "type": "string",
+          "description": "Timestamp indicating when the link was accessed.",
+          "format": "date-time"
+        },
+        "botDetectionResult": {
+          "type": "boolean",
+          "description": "Boolean indicating whether the user passed the bot detection (true) or failed (false)."
+        },
+        "redirectTimestamp": {
+          "type": "string",
+          "description": "Timestamp indicating when the user was redirected, if applicable.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "redirectLinkId",
+        "userIdentifier",
+        "accessTimestamp",
+        "botDetectionResult"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/redirectLinks/{redirectLinkId}",
+        "definition": {
+          "entityName": "RedirectLink",
+          "schema": {
+            "$ref": "#/backend/entities/RedirectLink"
+          },
+          "description": "Stores the core data for each redirect link. Publicly accessible for redirection, but write-protected to prevent unauthorized modification.",
+          "params": [
+            {
+              "name": "redirectLinkId",
+              "description": "Unique identifier for the redirect link."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/redirectLinks/{redirectLinkId}/userActivities/{userActivityId}",
+        "definition": {
+          "entityName": "UserActivity",
+          "schema": {
+            "$ref": "#/backend/entities/UserActivity"
+          },
+          "description": "Logs user activity associated with a specific redirect link. Includes denormalized 'redirectLinkId' for authorization independence.",
+          "params": [
+            {
+              "name": "redirectLinkId",
+              "description": "Reference to the parent RedirectLink."
+            },
+            {
+              "name": "userActivityId",
+              "description": "Unique identifier for the user activity record."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This design prioritizes security and scalability for managing redirect links. It segregates redirect links into a top-level collection, enabling efficient listing and management. User activity is stored in a subcollection under each redirect link, facilitating easy querying of user interactions with specific links. This structure uses path-based authorization and denormalization, avoiding hierarchical authorization dependencies.\n\nAuthorization Independence:\nEach document in the `userActivities` subcollection denormalizes the `redirectLinkId` from the parent `redirectLinks` document. This eliminates the need for rules to `get()` the parent document, satisfying the Authorization Independence principle. Rules can validate the `redirectLinkId` in the `request.resource.data` field without needing to read the parent document.\n\nQAPs:\n1. Secure List Operations: The segregation of `redirectLinks` ensures that listing redirect links doesn't expose user activity data. Security rules on `redirectLinks` can be simple and efficient.\n2. Private User Data: User activity data is kept private because it resides within the `userActivities` subcollection. Access to this data can be controlled based on the `redirectLinkId`.\n3. DBAC via request.auth.uid: The structure relies solely on `request.auth.uid`, since roles are not specified. The Firebase rules can guarantee that only authenticated users can create new redirect links."
+  }
+}

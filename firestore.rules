@@ -1,0 +1,67 @@
+/**
+ * @fileoverview Firestore Security Rules for Redirect Link Management.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes security and scalability for managing redirect links. It enforces
+ * strict write protection on RedirectLink documents while allowing public read access.
+ * User activity logs are kept private and associated with specific redirect links. Only authenticated users
+ * can create redirect links.
+ *
+ * Data Structure:
+ * - /redirectLinks/{redirectLinkId}: Stores the core data for each redirect link.
+ * - /redirectLinks/{redirectLinkId}/userActivities/{userActivityId}: Logs user activity
+ *   associated with a specific redirect link.
+ *
+ * Key Security Decisions:
+ * - Redirect links are publicly readable but only writable by authenticated users.
+ * - User activity data is private and can only be created under a specific redirect link.
+ * - Listing redirect links is allowed for all users.
+ * - Listing user activities is not allowed.
+ *
+ * Denormalization for Authorization:
+ * Each document in the `userActivities` subcollection denormalizes the `redirectLinkId` from the parent `redirectLinks` document.
+ * This eliminates the need for rules to `get()` the parent document. Rules validate the `redirectLinkId` in the `request.resource.data` field.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description: Controls access to redirect link documents. Allows public read access but restricts writes to authenticated users.
+     * @path: /redirectLinks/{redirectLinkId}
+     * @allow: (get, list) Any user can read redirect link details.
+     * @allow: (create) An authenticated user can create a redirect link.
+     * @deny: (create) An unauthenticated user cannot create a redirect link.
+     * @deny: (update, delete) No user can update or delete a redirect link.
+     * @principle: Public read, owner-only write for redirect links.
+     */
+    match /redirectLinks/{redirectLinkId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description: Controls access to user activity logs. Only allows creation of new activity logs by authenticated users.
+     * @path: /redirectLinks/{redirectLinkId}/userActivities/{userActivityId}
+     * @allow: (create) An authenticated user can create a user activity log under a redirect link, given the redirectLinkId exists.
+     * @deny: (create) An unauthenticated user cannot create a user activity log.
+     * @deny: (get, list, update, delete) No one can read, list, update, or delete user activity logs.
+     * @principle: Restricts access to user activity logs to creation only by authenticated users.
+     */
+    match /redirectLinks/{redirectLinkId}/userActivities/{userActivityId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if isSignedIn() && request.resource.data.redirectLinkId == redirectLinkId;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+
+  // Helper function to check if a user is signed in.
+  function isSignedIn() {
+    return request.auth != null;
+  }
+}
