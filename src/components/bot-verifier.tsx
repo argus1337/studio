@@ -1,16 +1,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
-export default function BotVerifier() {
-    const searchParams = useSearchParams();
-    const redirectUrl = searchParams.get('redirect_url') || 'https://depop.com';
+export default function BotVerifier({ redirectUrl = 'https://depop.com' }: { redirectUrl?: string }) {
 
     const [isMounted, setIsMounted] = useState(false);
     const [isChecked, setIsChecked] = useState(false);
@@ -34,7 +31,9 @@ export default function BotVerifier() {
 
             timer = setTimeout(() => {
                 setIsRedirecting(true);
-                window.location.href = redirectUrl;
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
+                }
             }, totalRedirectTime);
 
             return () => {
@@ -55,7 +54,7 @@ export default function BotVerifier() {
     }
 
     return (
-        <Dialog open={!isVerifying}>
+        <Dialog open={true}>
             <DialogContent className="sm:max-w-[425px] bg-background text-foreground rounded-lg shadow-2xl border-border p-8 text-center">
                 <div className={cn("transition-opacity duration-500", isVerifying ? "opacity-0" : "opacity-100")}>
                     <h3 className="text-2xl font-bold mb-4">Verify your access</h3>
@@ -73,18 +72,15 @@ export default function BotVerifier() {
                         Verify
                     </Button>
                 </div>
-            </DialogContent>
-            
-            <Dialog open={isVerifying}>
-                <DialogContent className="sm:max-w-[425px] bg-background text-foreground rounded-lg shadow-2xl border-border p-8 text-center flex flex-col items-center justify-center min-h-[300px]">
-                    <div className={cn("flex flex-col items-center justify-center transition-opacity duration-500", isRedirecting ? "opacity-0" : "opacity-100")}>
+                 <div className={cn("absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-500", isVerifying ? "opacity-100" : "opacity-0 pointer-events-none")}>
+                     <div className={cn("flex flex-col items-center justify-center transition-opacity duration-500", isRedirecting ? "opacity-0" : "opacity-100")}>
                          <Loader2 className="h-16 w-16 animate-spin text-primary mb-6" />
                         <h3 className="text-2xl font-bold mb-2">Verification successful!</h3>
                         <p className="text-muted-foreground">Redirecting you in...</p>
                         <p className="text-6xl font-bold text-primary mt-4">{countdown}</p>
                     </div>
-                </DialogContent>
-            </Dialog>
+                 </div>
+            </DialogContent>
         </Dialog>
     );
 }
