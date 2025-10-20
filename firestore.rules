@@ -1,67 +1,56 @@
 /**
- * @fileoverview Firestore Security Rules for Redirect Link Management.
+ * @file Firebase Security Rules for Redirect Link Management
  *
- * Core Philosophy:
- * This ruleset prioritizes security and scalability for managing redirect links. It enforces
- * strict write protection on RedirectLink documents while allowing public read access.
- * User activity logs are kept private and associated with specific redirect links. Only authenticated users
- * can create redirect links.
+ * @core_philosophy This ruleset prioritizes secure management of redirect links and associated user activity. It enforces strict access control to prevent unauthorized modification of redirect links while allowing public access for redirection purposes. User activity is securely logged and associated with specific redirect links, ensuring data privacy and enabling activity tracking.
  *
- * Data Structure:
- * - /redirectLinks/{redirectLinkId}: Stores the core data for each redirect link.
- * - /redirectLinks/{redirectLinkId}/userActivities/{userActivityId}: Logs user activity
- *   associated with a specific redirect link.
+ * @data_structure
+ * - `/redirectLinks/{redirectLinkId}`: Stores the core data for each redirect link.
+ * - `/redirectLinks/{redirectLinkId}/userActivities/{userActivityId}`: Logs user activity associated with a specific redirect link.
  *
- * Key Security Decisions:
- * - Redirect links are publicly readable but only writable by authenticated users.
- * - User activity data is private and can only be created under a specific redirect link.
- * - Listing redirect links is allowed for all users.
- * - Listing user activities is not allowed.
+ * @key_security_decisions
+ * - Redirect links are publicly readable for redirection purposes but write-protected to prevent unauthorized modification.
+ * - User activity logs are private and accessible only with proper authorization.
+ * - Listing of redirect links is allowed, but listing of user activities is restricted.
+ * - The rules rely solely on `request.auth.uid` for authorization, given the absence of specified roles.
+ * - Authorization independence is achieved by denormalizing `redirectLinkId` in the `userActivities` subcollection, eliminating the need for rules to `get()` the parent `redirectLinks` document.
  *
- * Denormalization for Authorization:
- * Each document in the `userActivities` subcollection denormalizes the `redirectLinkId` from the parent `redirectLinks` document.
- * This eliminates the need for rules to `get()` the parent document. Rules validate the `redirectLinkId` in the `request.resource.data` field.
+ * @denormalization_for_authorization
+ * - The `userActivities` subcollection denormalizes the `redirectLinkId` from the parent `redirectLinks` document. This eliminates the need for rules to `get()` the parent document, satisfying the Authorization Independence principle. Rules can validate the `redirectLinkId` in the `request.resource.data` field without needing to read the parent document.
+ *
+ * @structural_segregation
+ * - Redirect links and user activity data are stored in separate collections (`redirectLinks` and `userActivities`), ensuring that listing redirect links doesn't expose user activity data and that user activity data remains private.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description: Controls access to redirect link documents. Allows public read access but restricts writes to authenticated users.
-     * @path: /redirectLinks/{redirectLinkId}
-     * @allow: (get, list) Any user can read redirect link details.
-     * @allow: (create) An authenticated user can create a redirect link.
-     * @deny: (create) An unauthenticated user cannot create a redirect link.
-     * @deny: (update, delete) No user can update or delete a redirect link.
-     * @principle: Public read, owner-only write for redirect links.
+     * @description Allows reading redirect links for redirection purposes and restricts write access to prevent unauthorized modification.
+     * @path /redirectLinks/{redirectLinkId}
+     * @allow (get, list): if true
+     * @deny (create, update, delete): if false
+     * @principle Allows public read access for redirection and restricts write access to prevent unauthorized modification.
      */
     match /redirectLinks/{redirectLinkId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description: Controls access to user activity logs. Only allows creation of new activity logs by authenticated users.
-     * @path: /redirectLinks/{redirectLinkId}/userActivities/{userActivityId}
-     * @allow: (create) An authenticated user can create a user activity log under a redirect link, given the redirectLinkId exists.
-     * @deny: (create) An unauthenticated user cannot create a user activity log.
-     * @deny: (get, list, update, delete) No one can read, list, update, or delete user activity logs.
-     * @principle: Restricts access to user activity logs to creation only by authenticated users.
+     * @description Allows creating user activity records under a specific redirect link and restricts read/write access to prevent unauthorized data access.
+     * @path /redirectLinks/{redirectLinkId}/userActivities/{userActivityId}
+     * @allow (create): if isSignedIn() && request.resource.data.redirectLinkId == redirectLinkId;
+     * @deny (get, list, update, delete): if false
+     * @principle Restricts access to user activity data and ensures that the redirectLinkId matches the parent document.
      */
     match /redirectLinks/{redirectLinkId}/userActivities/{userActivityId} {
-      allow get: if false;
-      allow list: if false;
+      allow get, list, update, delete: if false;
       allow create: if isSignedIn() && request.resource.data.redirectLinkId == redirectLinkId;
-      allow update: if false;
-      allow delete: if false;
     }
-  }
 
-  // Helper function to check if a user is signed in.
-  function isSignedIn() {
-    return request.auth != null;
+    // --- Helper functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
   }
 }

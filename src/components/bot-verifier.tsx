@@ -7,7 +7,12 @@ import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
-export default function BotVerifier({ redirectUrl = 'https://depop.com' }: { redirectUrl?: string }) {
+type BotVerifierProps = {
+    redirectUrl?: string;
+    onVerified?: () => void;
+};
+
+export default function BotVerifier({ redirectUrl = 'https://depop.com', onVerified }: BotVerifierProps) {
 
     const [isMounted, setIsMounted] = useState(false);
     const [isChecked, setIsChecked] = useState(false);
@@ -30,9 +35,13 @@ export default function BotVerifier({ redirectUrl = 'https://depop.com' }: { red
             }, 1000);
 
             timer = setTimeout(() => {
-                setIsRedirecting(true);
-                if (redirectUrl) {
-                    window.location.href = redirectUrl;
+                if (onVerified) {
+                    onVerified();
+                } else {
+                    setIsRedirecting(true);
+                    if (redirectUrl) {
+                        window.location.href = redirectUrl;
+                    }
                 }
             }, totalRedirectTime);
 
@@ -41,7 +50,7 @@ export default function BotVerifier({ redirectUrl = 'https://depop.com' }: { red
                 clearInterval(countdownInterval);
             };
         }
-    }, [isVerifying, redirectUrl]);
+    }, [isVerifying, redirectUrl, onVerified]);
 
     const handleVerify = () => {
         if (isChecked) {
@@ -73,11 +82,11 @@ export default function BotVerifier({ redirectUrl = 'https://depop.com' }: { red
                     </Button>
                 </div>
                  <div className={cn("absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-500", isVerifying ? "opacity-100" : "opacity-0 pointer-events-none")}>
-                     <div className={cn("flex flex-col items-center justify-center transition-opacity duration-500", isRedirecting ? "opacity-0" : "opacity-100")}>
+                     <div className={cn("flex flex-col items-center justify-center transition-opacity duration-500", (isRedirecting || onVerified) ? "opacity-0" : "opacity-100")}>
                          <Loader2 className="h-16 w-16 animate-spin text-primary mb-6" />
                         <h3 className="text-2xl font-bold mb-2">Verification successful!</h3>
-                        <p className="text-muted-foreground">Redirecting you in...</p>
-                        <p className="text-6xl font-bold text-primary mt-4">{countdown}</p>
+                        <p className="text-muted-foreground">{onVerified ? "Loading page..." : "Redirecting you in..."}</p>
+                        {!onVerified && <p className="text-6xl font-bold text-primary mt-4">{countdown}</p>}
                     </div>
                  </div>
             </DialogContent>

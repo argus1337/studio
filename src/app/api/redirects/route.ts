@@ -2,10 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { collection, doc, setDoc, getFirestore, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { customAlphabet } from 'nanoid';
 import { firebaseConfig } from '@/firebase/config';
-
-const nanoid = customAlphabet('1234567890abcdefghijklmnopqrstuvwxyz', 6);
 
 // Helper function to initialize Firebase on the server-side if not already done.
 function initializeServerApp() {
@@ -18,17 +15,20 @@ function initializeServerApp() {
 export async function POST(req: NextRequest) {
   try {
     const app = initializeServerApp();
+    // Use initializeFirestore for server-side usage
     const firestore = initializeFirestore(app, {
       cacheSizeBytes: CACHE_SIZE_UNLIMITED
     });
 
-    const { targetUrl } = await req.json();
+    const { targetUrl, id } = await req.json();
 
     if (!targetUrl || typeof targetUrl !== 'string') {
       return NextResponse.json({ error: 'targetUrl is required' }, { status: 400 });
     }
+     if (!id || typeof id !== 'string') {
+      return NextResponse.json({ error: 'id is required for the link' }, { status: 400 });
+    }
 
-    const id = nanoid();
     const origin = req.nextUrl.protocol + '//' + req.nextUrl.host;
     const shortUrl = `${origin}/item/${id}`;
 
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     };
 
     const redirectLinksRef = collection(firestore, 'redirectLinks');
+    // Use the provided id for the document
     await setDoc(doc(redirectLinksRef, id), newLink);
 
     return NextResponse.json({ shortUrl }, { status: 201 });

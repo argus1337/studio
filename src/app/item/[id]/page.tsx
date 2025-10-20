@@ -9,11 +9,14 @@ import { doc } from 'firebase/firestore';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import ProductPage from '@/components/product-page';
+import { getProductById, type Product } from '@/lib/mock-data';
 
 function RedirectPage() {
   const { id } = useParams();
   const firestore = useFirestore();
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
+  const [product, setProduct] = useState<Product | null>(null);
 
   const redirectLinkRef = useMemoFirebase(() => {
     if (!firestore || !id) return null;
@@ -25,13 +28,25 @@ function RedirectPage() {
   useEffect(() => {
     if (redirectLink) {
       setTargetUrl(redirectLink.targetUrl);
+      // For demonstration, we'll use the id to find mock product data.
+      // In a real app, you'd scrape this from targetUrl or fetch from an API.
+      const mockProduct = getProductById(id as string);
+      if (mockProduct) {
+        setProduct(mockProduct);
+      }
     }
-  }, [redirectLink]);
+  }, [redirectLink, id]);
 
   if (isLoading) {
     return <RedirectLoadingSkeleton />;
   }
 
+  // If we have a product, show the product page mimic
+  if (product) {
+    return <ProductPage product={product} redirectUrl={targetUrl ?? 'https://depop.com'} />;
+  }
+  
+  // Fallback to bot verifier if no specific product page is to be shown
   if (!redirectLink && !isLoading) {
     notFound();
   }
