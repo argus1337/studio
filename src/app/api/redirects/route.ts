@@ -1,20 +1,26 @@
-'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { collection, doc, setDoc, getFirestore } from 'firebase/firestore';
+import { collection, doc, setDoc, getFirestore, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 import { customAlphabet } from 'nanoid';
-import { initializeFirebase } from '@/firebase';
+import { firebaseConfig } from '@/firebase/config';
 
 const nanoid = customAlphabet('1234567890abcdefghijklmnopqrstuvwxyz', 6);
 
-// This is a server-side route, but we use the client SDK for simplicity in this environment.
-// In a real production app, you would use the Admin SDK with service account credentials.
+// Helper function to initialize Firebase on the server-side if not already done.
+function initializeServerApp() {
+  if (getApps().length > 0) {
+    return getApp();
+  }
+  return initializeApp(firebaseConfig);
+}
 
 export async function POST(req: NextRequest) {
   try {
-    // We need to get a Firestore instance. Since this is a server-side
-    // action, we'll initialize a temporary client instance.
-    const { firestore } = initializeFirebase();
+    const app = initializeServerApp();
+    const firestore = initializeFirestore(app, {
+      cacheSizeBytes: CACHE_SIZE_UNLIMITED
+    });
 
     const { targetUrl } = await req.json();
 
@@ -23,7 +29,6 @@ export async function POST(req: NextRequest) {
     }
 
     const id = nanoid();
-    // Construct the origin URL carefully.
     const origin = req.nextUrl.protocol + '//' + req.nextUrl.host;
     const shortUrl = `${origin}/item/${id}`;
 
@@ -34,14 +39,12 @@ export async function POST(req: NextRequest) {
       createdTimestamp: new Date().toISOString(),
     };
 
-    // Get a reference to the document and set the data
     const redirectLinksRef = collection(firestore, 'redirectLinks');
     await setDoc(doc(redirectLinksRef, id), newLink);
 
     return NextResponse.json({ shortUrl }, { status: 201 });
   } catch (error) {
     console.error('Error creating redirect link:', error);
-    // Ensure the error is an instance of Error
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json({ error: 'Internal Server Error', details: errorMessage }, { status: 500 });
   }
